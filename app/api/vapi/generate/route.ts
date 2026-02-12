@@ -9,30 +9,49 @@ export async function POST(request: Request) {
     const { type, role, level, techstack, amount, userid } =
       await request.json();
 
-    const { text: questions } = await generateText({
+    const { text } = await generateText({
       model: openai("gpt-4o-mini"),
-      prompt: `Prepare questions for a job interview.
-The job role is ${role}.
-The job experience level is ${level}.
-The tech stack used in the job is: ${techstack}.
-The focus between behavioural and technical questions should lean towards: ${type}.
-The amount of questions required is: ${amount}.
+      prompt: `You are a professional technical interviewer.
 
-IMPORTANT:
-- Return only a JSON array.
-- Do not include explanation text.
-- Do not use special characters like "/" or "*".
-- Format exactly like:
+Generate ${amount} interview questions.
+
+Role: ${role}
+Experience Level: ${level}
+Tech Stack: ${techstack}
+Focus Type: ${type}
+
+IMPORTANT RULES:
+- Return ONLY a valid JSON array.
+- No explanation.
+- No extra text.
+- No markdown.
+- No special characters like "/" or "*".
+- Format strictly like:
 ["Question 1", "Question 2", "Question 3"]
 `,
     });
+
+    // Clean response just in case
+    const cleaned = text.trim();
+
+    let parsedQuestions: string[] = [];
+
+    try {
+      parsedQuestions = JSON.parse(cleaned);
+    } catch {
+      // Fallback safety (in case model slightly misformats)
+      parsedQuestions = cleaned
+        .replace(/[\[\]]/g, "")
+        .split(",")
+        .map((q) => q.replace(/"/g, "").trim());
+    }
 
     const interview = {
       role,
       type,
       level,
       techstack: techstack.split(","),
-      questions: JSON.parse(questions),
+      questions: parsedQuestions,
       userId: userid,
       finalized: true,
       coverImage: getRandomInterviewCover(),
